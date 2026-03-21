@@ -45,7 +45,7 @@ export default function InstallPrompt() {
   return (
     <div className="fixed bottom-4 left-4 right-4 z-40 slide-up">
       <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-gray-900 p-4 shadow-2xl">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-red-600 text-lg font-black text-white">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-600 text-lg font-black text-white">
           S
         </div>
         <div className="flex-1 min-w-0">

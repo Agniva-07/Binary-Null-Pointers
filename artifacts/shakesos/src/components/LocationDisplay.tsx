@@ -48,7 +48,7 @@ export default function LocationDisplay({ location }: LocationDisplayProps) {
           href={mapsLink}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-shrink-0 rounded-lg bg-green-700/30 border border-green-700/40 px-2.5 py-1.5 text-xs font-medium text-green-400"
+          className="shrink-0 rounded-lg bg-green-700/30 border border-green-700/40 px-2.5 py-1.5 text-xs font-medium text-green-400"
         >
           Maps →
         </a>

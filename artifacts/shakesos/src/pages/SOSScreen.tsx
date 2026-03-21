@@ -3,6 +3,8 @@ import { LocationData } from "@/hooks/useGeolocation";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import LocationDisplay from "@/components/LocationDisplay";
 
+import type { SensorStatus } from "@/hooks/useShakeDetection";
+
 interface SOSScreenProps {
   isMonitoring: boolean;
   sosTriggered: boolean;
@@ -11,6 +13,10 @@ interface SOSScreenProps {
   onResetSOS: () => void;
   onStop: () => void;
   onContact: () => void;
+  isRecording?: boolean;
+  onSiren?: () => void;
+  sensorStatus?: SensorStatus;
+  lastAccel?: number;
 }
 
 export default function SOSScreen({
@@ -21,6 +27,10 @@ export default function SOSScreen({
   onResetSOS,
   onStop,
   onContact,
+  isRecording = false,
+  onSiren,
+  sensorStatus = "pending",
+  lastAccel = 0,
 }: SOSScreenProps) {
   const [shakeCount, setShakeCount] = useState(0);
   const [pressing, setPressing] = useState(false);
@@ -73,9 +83,8 @@ export default function SOSScreen({
 
   return (
     <div
-      className={`flex min-h-screen flex-col bg-background px-5 py-8 transition-colors duration-500 ${
-        sosTriggered ? "active-monitoring" : ""
-      }`}
+      className={`flex min-h-screen flex-col bg-background px-5 py-8 transition-colors duration-500 ${sosTriggered ? "active-monitoring" : ""
+        }`}
     >
       <div className="w-full max-w-sm mx-auto flex flex-col h-full min-h-screen justify-between">
         <div>
@@ -88,10 +97,15 @@ export default function SOSScreen({
             </button>
 
             <div className="flex items-center gap-2">
+              {isRecording && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-bold text-red-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                  REC
+                </span>
+              )}
               <div
-                className={`h-2 w-2 rounded-full ${
-                  isMonitoring ? "bg-green-500 animate-pulse" : "bg-gray-600"
-                }`}
+                className={`h-2 w-2 rounded-full ${isMonitoring ? "bg-green-500 animate-pulse" : "bg-gray-600"
+                  }`}
               />
               <span className="text-sm font-medium text-gray-400">
                 {isMonitoring ? "Monitoring" : "Inactive"}
@@ -116,6 +130,9 @@ export default function SOSScreen({
                 <div>
                   <p className="font-bold text-red-400">SOS TRIGGERED</p>
                   <p className="text-xs text-red-300/70">Emergency message sent via WhatsApp</p>
+                  {isRecording && (
+                    <p className="text-xs text-orange-400 mt-0.5">🎤 Audio recording active</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -159,15 +176,48 @@ export default function SOSScreen({
               {[1, 2, 3].map((n) => (
                 <div
                   key={n}
-                  className={`flex-1 h-2 rounded-full transition-all duration-300 ${
-                    shakeCount >= n ? "bg-red-500" : "bg-gray-700"
-                  }`}
+                  className={`flex-1 h-2 rounded-full transition-all duration-300 ${shakeCount >= n ? "bg-red-500" : "bg-gray-700"
+                    }`}
                 />
               ))}
             </div>
             <p className="mt-2 text-center text-xs text-gray-600">
               {isMonitoring ? "Shake your phone 2–3× to trigger alert" : "Monitoring stopped"}
             </p>
+
+            {/* Sensor Debug Info */}
+            <div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${sensorStatus === "active" ? "bg-green-500 animate-pulse" :
+                    sensorStatus === "denied" ? "bg-red-500" :
+                      sensorStatus === "unavailable" ? "bg-gray-600" :
+                        "bg-yellow-500 animate-pulse"
+                  }`} />
+                <span className="text-[10px] text-gray-500">
+                  Sensor: {sensorStatus === "active" ? "Active" :
+                    sensorStatus === "denied" ? "Permission denied" :
+                      sensorStatus === "unavailable" ? "Not available" :
+                        "Waiting..."}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-600">
+                  Accel: {lastAccel}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${window.location.protocol === "https:"
+                    ? "bg-green-900/40 text-green-500"
+                    : "bg-red-900/40 text-red-500"
+                  }`}>
+                  {window.location.protocol === "https:" ? "🔒 HTTPS" : "⚠️ HTTP"}
+                </span>
+              </div>
+            </div>
+
+            {window.location.protocol !== "https:" && (
+              <p className="mt-2 text-[10px] text-yellow-600">
+                ⚠️ Shake detection requires HTTPS. Use the HTTPS URL to enable accelerometer access.
+              </p>
+            )}
           </div>
         </div>
 
@@ -178,9 +228,8 @@ export default function SOSScreen({
               onPointerUp={() => setPressing(false)}
               onPointerLeave={() => setPressing(false)}
               onClick={sosTriggered ? onResetSOS : onManualSOS}
-              className={`sos-btn relative flex h-44 w-44 flex-col items-center justify-center rounded-full text-white transition-all ${
-                sosTriggered ? "bg-orange-600" : "bg-red-600"
-              } ${pressing ? "shake-btn" : ""}`}
+              className={`sos-btn relative flex h-44 w-44 flex-col items-center justify-center rounded-full text-white transition-all ${sosTriggered ? "bg-orange-600" : "bg-red-600"
+                } ${pressing ? "shake-btn" : ""}`}
               style={{
                 boxShadow: pressing
                   ? `0 2px 12px rgba(220,38,38,0.7)`
@@ -196,12 +245,22 @@ export default function SOSScreen({
           </div>
 
           {sosTriggered && (
-            <button
-              onClick={sendWhatsApp}
-              className="w-full rounded-xl bg-green-600 py-3.5 text-sm font-bold text-white transition-all active:scale-95 active:bg-green-700"
-            >
-              📲 Resend WhatsApp SOS
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={sendWhatsApp}
+                className="w-full rounded-xl bg-green-600 py-3.5 text-sm font-bold text-white transition-all active:scale-95 active:bg-green-700"
+              >
+                📲 Resend WhatsApp SOS
+              </button>
+              {onSiren && (
+                <button
+                  onClick={onSiren}
+                  className="w-full rounded-xl bg-red-700 py-3.5 text-sm font-bold text-white transition-all active:scale-95"
+                >
+                  🚨 Activate Siren & Strobe
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

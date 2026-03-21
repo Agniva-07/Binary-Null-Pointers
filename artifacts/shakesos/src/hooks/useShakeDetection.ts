@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 
 interface UseShakeDetectionOptions {
   onShake: () => void;
@@ -8,17 +8,19 @@ interface UseShakeDetectionOptions {
   windowMs?: number;
 }
 
+export type SensorStatus = "unavailable" | "pending" | "denied" | "active";
+
 export function useShakeDetection({
   onShake,
   enabled,
-  threshold = 18,
+  threshold = 12, // lowered from 18 for better sensitivity on mobile
   requiredShakes = 2,
-  windowMs = 1500,
+  windowMs = 2000, // wider window
 }: UseShakeDetectionOptions) {
   const shakesRef = useRef<number[]>([]);
-  const lastAccelRef = useRef({ x: 0, y: 0, z: 0 });
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastShakeRef = useRef<number>(0);
+  const lastTriggerRef = useRef<number>(0);
+  const [sensorStatus, setSensorStatus] = useState<SensorStatus>("pending");
+  const [lastAccel, setLastAccel] = useState<number>(0);
 
   const handleMotion = useCallback(
     (event: DeviceMotionEvent) => {
@@ -29,44 +31,67 @@ export function useShakeDetection({
       const y = acc.y ?? 0;
       const z = acc.z ?? 0;
 
-      const deltaX = Math.abs(x - lastAccelRef.current.x);
-      const deltaY = Math.abs(y - lastAccelRef.current.y);
-      const deltaZ = Math.abs(z - lastAccelRef.current.z);
+      // Calculate delta from gravity (~9.8 on z-axis when stationary)
+      // Use acceleration if available, otherwise calculate from accelerationIncludingGravity
+      let totalDelta: number;
 
-      lastAccelRef.current = { x, y, z };
+      if (event.acceleration && event.acceleration.x !== null) {
+        // Pure acceleration without gravity — best source
+        const ax = event.acceleration.x ?? 0;
+        const ay = event.acceleration.y ?? 0;
+        const az = event.acceleration.z ?? 0;
+        totalDelta = Math.sqrt(ax * ax + ay * ay + az * az);
+      } else {
+        // Fallback: use accelerationIncludingGravity
+        // Subtract approximate gravity magnitude
+        const magnitude = Math.sqrt(x * x + y * y + z * z);
+        totalDelta = Math.abs(magnitude - 9.81);
+      }
 
-      const totalDelta = deltaX + deltaY + deltaZ;
+      // Update last acceleration for debug display
+      setLastAccel(Math.round(totalDelta * 10) / 10);
+
+      // Mark sensor as active if we're getting data
+      setSensorStatus("active");
 
       if (totalDelta > threshold) {
         const now = Date.now();
-
-        if (now - lastShakeRef.current < 200) return;
-        lastShakeRef.current = now;
-
         shakesRef.current.push(now);
+
+        // Filter old shakes outside our window
         shakesRef.current = shakesRef.current.filter(
           (t) => now - t < windowMs
         );
 
         if (shakesRef.current.length >= requiredShakes) {
-          shakesRef.current = [];
-
-          if (debounceRef.current) clearTimeout(debounceRef.current);
-          debounceRef.current = setTimeout(() => {
+          // Debounce: don't fire again within 3 seconds
+          if (now - lastTriggerRef.current > 3000) {
+            lastTriggerRef.current = now;
+            shakesRef.current = [];
             onShake();
-          }, 100);
+          }
         }
       }
     },
-    [onShake, threshold, requiredShakes, windowMs]
+    [threshold, requiredShakes, windowMs, onShake]
   );
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setSensorStatus("pending");
+      return;
+    }
+
+    // Check if DeviceMotionEvent is available
+    if (typeof DeviceMotionEvent === "undefined") {
+      setSensorStatus("unavailable");
+      return;
+    }
+    let checkTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const requestPermission = async () => {
+      // iOS 13+ requires explicit permission
       if (
-        typeof DeviceMotionEvent !== "undefined" &&
         typeof (DeviceMotionEvent as unknown as { requestPermission?: () => Promise<string> })
           .requestPermission === "function"
       ) {
@@ -76,20 +101,56 @@ export function useShakeDetection({
           ).requestPermission();
           if (permission === "granted") {
             window.addEventListener("devicemotion", handleMotion);
+            setSensorStatus("active");
+          } else {
+            setSensorStatus("denied");
           }
         } catch {
+          // Try adding the listener anyway — some browsers don't implement requestPermission
           window.addEventListener("devicemotion", handleMotion);
+          setSensorStatus("active");
         }
       } else {
+        // Non-iOS — just add the listener
         window.addEventListener("devicemotion", handleMotion);
+        setSensorStatus("active");
       }
     };
 
     requestPermission();
 
     return () => {
+      if (checkTimeout) clearTimeout(checkTimeout);
       window.removeEventListener("devicemotion", handleMotion);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [enabled, handleMotion]);
+
+  // Keyboard shortcut for desktop testing: press 'S' to simulate shake
+  useEffect(() => {
+    if (!enabled) return;
+
+    let keyPresses: number[] = [];
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "s" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Don't trigger if user is typing in an input
+        const target = e.target as HTMLElement;
+        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+
+        const now = Date.now();
+        keyPresses.push(now);
+        keyPresses = keyPresses.filter((t) => now - t < 2000);
+
+        if (keyPresses.length >= 3) {
+          keyPresses = [];
+          onShake();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [enabled, onShake]);
+
+  return { sensorStatus, lastAccel };
 }

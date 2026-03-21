@@ -7,7 +7,7 @@ out-tsc
 *.tsbuildinfo
 .expo
 .expo-shared
-
+   
 # dependencies
 node_modules
 
@@ -47,3 +47,9 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+node_modules
+dist
+.env
+.vscode
+.DS_Store

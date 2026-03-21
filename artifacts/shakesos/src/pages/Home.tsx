@@ -3,14 +3,16 @@ import { useState } from "react";
 interface HomeProps {
   onStart: () => void;
   onContact: () => void;
+  isMonitoring: boolean;
+  isRecording: boolean;
 }
 
-export default function Home({ onStart, onContact }: HomeProps) {
+export default function Home({ onStart, onContact, isMonitoring, isRecording }: HomeProps) {
   const [pressing, setPressing] = useState(false);
   const contact = localStorage.getItem("shakesos-contact") || "";
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-between bg-background px-6 py-10">
+    <div className="flex min-h-screen flex-col items-center justify-between bg-background px-6 py-10 pb-28">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="mb-3 flex justify-center">
@@ -20,6 +22,22 @@ export default function Home({ onStart, onContact }: HomeProps) {
           </div>
           <h1 className="text-3xl font-black text-white">ShakeSOS</h1>
           <p className="mt-1 text-sm text-gray-400">Emergency Alert System</p>
+
+          {/* Status indicators */}
+          <div className="flex items-center justify-center gap-4 mt-3">
+            {isMonitoring && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-600/20 px-3 py-1 text-xs font-medium text-green-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                Monitoring
+              </span>
+            )}
+            {isRecording && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/20 px-3 py-1 text-xs font-medium text-red-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                Recording
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="mb-8 space-y-3 rounded-2xl border border-gray-800 bg-gray-900/50 p-5">
@@ -30,12 +48,37 @@ export default function Home({ onStart, onContact }: HomeProps) {
               { icon: "⚠️", text: "A popup asks if you're OK with a 15-second timer" },
               { icon: "🆘", text: "If no response, SOS is sent automatically" },
               { icon: "📍", text: "Your location is shared via WhatsApp" },
+              { icon: "🎤", text: "Audio recording starts automatically on SOS" },
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-3">
                 <span className="text-lg">{item.icon}</span>
                 <p className="text-sm text-gray-400">{item.text}</p>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Feature Grid */}
+        <div className="mb-6 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-3 text-center">
+            <span className="text-2xl mb-1 block">🚨</span>
+            <p className="text-xs font-medium text-gray-300">Siren Mode</p>
+            <p className="text-[10px] text-gray-500">In Tools</p>
+          </div>
+          <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-3 text-center">
+            <span className="text-2xl mb-1 block">📞</span>
+            <p className="text-xs font-medium text-gray-300">Fake Call</p>
+            <p className="text-[10px] text-gray-500">In Fake Call tab</p>
+          </div>
+          <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-3 text-center">
+            <span className="text-2xl mb-1 block">⏱️</span>
+            <p className="text-xs font-medium text-gray-300">Safety Timer</p>
+            <p className="text-[10px] text-gray-500">In Timer tab</p>
+          </div>
+          <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-3 text-center">
+            <span className="text-2xl mb-1 block">🤸</span>
+            <p className="text-xs font-medium text-gray-300">Fall Detection</p>
+            <p className="text-[10px] text-gray-500">In Tools</p>
           </div>
         </div>
 
