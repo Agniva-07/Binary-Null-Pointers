@@ -3,17 +3,23 @@
   "include": ["src/**/*"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
-  "noEmit": true,
-  "jsx": "react-jsx",
-  "lib": ["esnext", "dom", "dom.iterable"],
-  "resolveJsonModule": true,
-  "allowImportingTsExtensions": true,
-  "moduleResolution": "bundler",
-  "types": ["node", "vite/client"],
-  "paths": {
-    "@/*": ["./src/*"]
-  }
-},
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "moduleResolution": "bundler",
+
+    // 🔥 IMPORTANT FIXES
+    "types": ["node", "vite/client", "react", "react-dom"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
   "references": [
     {
       "path": "../../lib/api-client-react"

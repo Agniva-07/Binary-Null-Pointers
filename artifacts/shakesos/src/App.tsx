@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Router as WouterRouter, Switch, Route } from "wouter";
 import Home from "@/pages/Home";
 import ContactSetup from "@/pages/ContactSetup";
@@ -10,10 +10,14 @@ import FakeCallScreen from "@/components/FakeCallScreen";
 import SirenMode from "@/components/SirenMode";
 import SafetyTimer from "@/components/SafetyTimer";
 import BottomNav from "@/components/BottomNav";
+import NearbySOSAlert from "@/components/NearbySOSAlert";
 import { useShakeDetection } from "@/hooks/useShakeDetection";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useFallDetection } from "@/hooks/useFallDetection";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import { useActiveLocation } from "@/hooks/useActiveLocation";
+import { useSOSBroadcast, useNearbySosAlert } from "@/hooks/useNearbySOS";
+import { sosService } from "@/lib/sosService";
 
 export type AppPage = "home" | "contact" | "sos" | "timer" | "fakecall" | "tools";
 
@@ -34,6 +38,37 @@ function App() {
     stopRecording,
     downloadClip,
   } = useAudioRecorder();
+
+  // ── Community SOS hooks ──────────────────────────────────────────────
+  const activeLocation = useActiveLocation({ enabled: true });
+  const sosBroadcast = useSOSBroadcast();
+  const nearbyAlert = useNearbySosAlert(
+    activeLocation.userId,
+    activeLocation.lat,
+    activeLocation.lng
+  );
+
+  // Initialize mock users once we have a location
+  useEffect(() => {
+    if (activeLocation.lat && activeLocation.lng) {
+      sosService.initMockUsers(activeLocation.lat, activeLocation.lng);
+    }
+  }, [activeLocation.lat, activeLocation.lng]);
+
+  // ── Broadcast SOS when triggered ─────────────────────────────────────
+  const doBroadcastSOS = useCallback(() => {
+    const lat = location?.lat ?? activeLocation.lat;
+    const lng = location?.lng ?? activeLocation.lng;
+    if (lat && lng) {
+      sosBroadcast.broadcastSOS({
+        lat,
+        lng,
+        phone:
+          localStorage.getItem("shakesos-contact") || "+910000000000",
+        userId: activeLocation.userId,
+      });
+    }
+  }, [location, activeLocation.lat, activeLocation.lng, activeLocation.userId, sosBroadcast]);
 
   // Shake detection triggers emergency modal
   const onShakeDetected = useCallback(() => {
@@ -59,17 +94,19 @@ function App() {
     setShowModal(false);
     setSosTriggered(true);
     setPage("sos");
-    // Auto-start recording on SOS
     startRecording();
-  }, [startRecording]);
+    // Broadcast community SOS
+    setTimeout(() => doBroadcastSOS(), 500);
+  }, [startRecording, doBroadcastSOS]);
 
   const handleAutoTrigger = useCallback(() => {
     setShowModal(false);
     setSosTriggered(true);
     setPage("sos");
-    // Auto-start recording on SOS
     startRecording();
-  }, [startRecording]);
+    // Broadcast community SOS
+    setTimeout(() => doBroadcastSOS(), 500);
+  }, [startRecording, doBroadcastSOS]);
 
   const handleStartMonitoring = useCallback(() => {
     requestLocation();
@@ -81,18 +118,22 @@ function App() {
     setIsMonitoring(false);
     setSosTriggered(false);
     if (isRecording) stopRecording();
+    sosBroadcast.cancelSOS();
     setPage("home");
-  }, [isRecording, stopRecording]);
+  }, [isRecording, stopRecording, sosBroadcast]);
 
   const handleManualSOS = useCallback(() => {
     setSosTriggered(true);
     startRecording();
-  }, [startRecording]);
+    // Broadcast community SOS
+    setTimeout(() => doBroadcastSOS(), 500);
+  }, [startRecording, doBroadcastSOS]);
 
   const handleResetSOS = useCallback(() => {
     setSosTriggered(false);
     if (isRecording) stopRecording();
-  }, [isRecording, stopRecording]);
+    sosBroadcast.cancelSOS();
+  }, [isRecording, stopRecording, sosBroadcast]);
 
   // Safety Timer SOS
   const handleTimerSOS = useCallback(() => {
@@ -101,7 +142,9 @@ function App() {
     setIsMonitoring(true);
     setPage("sos");
     startRecording();
-  }, [requestLocation, startRecording]);
+    // Broadcast community SOS
+    setTimeout(() => doBroadcastSOS(), 500);
+  }, [requestLocation, startRecording, doBroadcastSOS]);
 
   const handleToggleRecording = useCallback(() => {
     if (isRecording) {
@@ -112,7 +155,6 @@ function App() {
   }, [isRecording, startRecording, stopRecording]);
 
   const handleNavigate = useCallback((newPage: AppPage) => {
-    // If we're in SOS monitoring mode and user navigates away, don't kill the monitoring
     setPage(newPage);
   }, []);
 
@@ -148,6 +190,9 @@ function App() {
                 onSiren={() => setShowSiren(true)}
                 sensorStatus={sensorStatus}
                 lastAccel={lastAccel}
+                isBroadcast={sosBroadcast.isBroadcast}
+                nearbyUsers={sosBroadcast.nearbyUsers}
+                volunteers={sosBroadcast.volunteers}
               />
             )}
             {page === "timer" && (
@@ -193,6 +238,16 @@ function App() {
           onOK={handleImOK}
           onHelp={handleHelpMe}
           onAutoTrigger={handleAutoTrigger}
+        />
+      )}
+
+      {/* Nearby SOS Alert Overlay */}
+      {nearbyAlert.activeAlert && (
+        <NearbySOSAlert
+          sosData={nearbyAlert.activeAlert.sosData}
+          distanceFromMe={nearbyAlert.activeAlert.distanceFromMe}
+          onAccept={nearbyAlert.acceptSOS}
+          onDismiss={nearbyAlert.dismissSOS}
         />
       )}
 

@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { LocationData } from "@/hooks/useGeolocation";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import LocationDisplay from "@/components/LocationDisplay";
+import VolunteerTracker from "@/components/VolunteerTracker";
 
 import type { SensorStatus } from "@/hooks/useShakeDetection";
+import type { NearbyUser, VolunteerInfo } from "@/lib/sosService";
 
 interface SOSScreenProps {
   isMonitoring: boolean;
@@ -17,6 +19,10 @@ interface SOSScreenProps {
   onSiren?: () => void;
   sensorStatus?: SensorStatus;
   lastAccel?: number;
+  // Community SOS props
+  isBroadcast?: boolean;
+  nearbyUsers?: NearbyUser[];
+  volunteers?: VolunteerInfo[];
 }
 
 export default function SOSScreen({
@@ -31,6 +37,9 @@ export default function SOSScreen({
   onSiren,
   sensorStatus = "pending",
   lastAccel = 0,
+  isBroadcast = false,
+  nearbyUsers = [],
+  volunteers = [],
 }: SOSScreenProps) {
   const [shakeCount, setShakeCount] = useState(0);
   const [pressing, setPressing] = useState(false);
@@ -135,6 +144,36 @@ export default function SOSScreen({
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Community SOS Broadcast Status */}
+          {sosTriggered && isBroadcast && (
+            <div
+              className="mb-4 rounded-2xl border border-blue-500/30 bg-blue-950/20 p-4 fade-in"
+              style={{ boxShadow: "0 0 20px rgba(59,130,246,0.15)" }}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl">📡</span>
+                <div>
+                  <p className="text-sm font-bold text-blue-400">
+                    Community Alert Sent
+                  </p>
+                  <p className="text-xs text-blue-300/60">
+                    {nearbyUsers.length} users notified within 50m
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Volunteer Tracker */}
+          {sosTriggered && isBroadcast && (
+            <div className="mb-5">
+              <VolunteerTracker
+                volunteers={volunteers}
+                nearbyCount={nearbyUsers.length}
+              />
             </div>
           )}
 
