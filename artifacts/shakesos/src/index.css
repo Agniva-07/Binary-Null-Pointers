@@ -194,3 +194,36 @@ audio {
 audio::-webkit-media-controls-panel {
   background: #1f2937;
 }
+
+/* ===== SOS ESCALATION SYSTEM ===== */
+
+/* Full-screen flash overlay during stage 2 / 3 */
+@keyframes sos-screen-flash {
+  0%, 100% { background-color: transparent; }
+  50%       { background-color: rgba(220, 38, 38, 0.08); }
+}
+
+body.sos-flash-overlay {
+  animation: sos-screen-flash 0.6s ease-in-out infinite;
+}
+
+/* Escalation card breathing glow */
+@keyframes escalation-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.85; transform: scale(1.06); }
+}
+
+.escalation-pulse {
+  animation: escalation-pulse 1s ease-in-out infinite;
+}
+
+/* Escalation card entrance */
+.escalation-card {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* SVG countdown ring smooth rotation hint */
+.countdown-ring {
+  display: block;
+}
+

@@ -136,6 +136,36 @@ function generateMockUsers(
   return users;
 }
 
+/**
+ * Generate mock users in a ring between minRadiusM and maxRadiusM.
+ */
+function generateMockUsersRing(
+  centerLat: number,
+  centerLng: number,
+  count: number,
+  minRadiusM: number,
+  maxRadiusM: number
+): UserLocation[] {
+  const users: UserLocation[] = [];
+  for (let i = 0; i < count; i++) {
+    const dist = minRadiusM + Math.random() * (maxRadiusM - minRadiusM);
+    const angle = Math.random() * 2 * Math.PI;
+    const dLat = (dist * Math.cos(angle)) / 111_320;
+    const dLng =
+      (dist * Math.sin(angle)) /
+      (111_320 * Math.cos(toRadians(centerLat)));
+    users.push({
+      userId: `mock-ring-${i}`,
+      lat: centerLat + dLat,
+      lng: centerLng + dLng,
+      phone: MOCK_PHONES[i % MOCK_PHONES.length],
+      displayName: MOCK_NAMES[(i + 5) % MOCK_NAMES.length],
+      timestamp: Date.now(),
+    });
+  }
+  return users;
+}
+
 // ── In-Memory Store ─────────────────────────────────────────────────────────
 
 class SOSService {
@@ -166,19 +196,30 @@ class SOSService {
   // ── Mock data ───────────────────────────────────────────────────────────
 
   /** Populate mock nearby users around the given center. */
-  initMockUsers(centerLat: number, centerLng: number): void {
-    if (this.mockInitialized) return;
+  initMockUsers(centerLat: number, centerLng: number, force = false): void {
+    if (this.mockInitialized && !force) return;
     this.mockInitialized = true;
 
-    // 6 users within 50m, 4 users 50-120m away (to show filtering)
-    const nearbyUsers = generateMockUsers(centerLat, centerLng, 6, 48);
-    const farUsers = generateMockUsers(centerLat, centerLng, 4, 120);
-    // ensure far users are actually > 50m
-    farUsers.forEach((u) => {
-      u.userId = `mock-far-${u.userId}`;
-    });
+    // Remove old mock users on re-init
+    if (force) {
+      for (const key of Array.from(this.activeUsers.keys())) {
+        if (key.startsWith("mock-")) this.activeUsers.delete(key);
+      }
+    }
 
-    [...nearbyUsers, ...farUsers].forEach((u) => {
+    // Tier 1: 6 users within 50m-90m (alerted at stage 1 — 100m radius)
+    const tier1 = generateMockUsers(centerLat, centerLng, 6, 90);
+    tier1.forEach((u, i) => { u.userId = `mock-t1-${i}`; });
+
+    // Tier 2: 5 users 100m-190m away (alerted at stage 2 — 200m radius)
+    const tier2 = generateMockUsersRing(centerLat, centerLng, 5, 100, 190);
+    tier2.forEach((u, i) => { u.userId = `mock-t2-${i}`; });
+
+    // Tier 3: 4 users 200m-500m away (alerted at higher radii)
+    const tier3 = generateMockUsersRing(centerLat, centerLng, 4, 200, 480);
+    tier3.forEach((u, i) => { u.userId = `mock-t3-${i}`; });
+
+    [...tier1, ...tier2, ...tier3].forEach((u) => {
       this.activeUsers.set(u.userId, u);
     });
   }
@@ -190,7 +231,7 @@ class SOSService {
    */
   broadcastSOS(
     sosData: Omit<SOSData, "id" | "active">,
-    radiusM: number = 50
+    radiusM: number = 500
   ): { sosId: string; nearbyUsers: NearbyUser[] } {
     const sosId = `sos-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const sos: SOSData = { ...sosData, id: sosId, active: true };
@@ -326,6 +367,21 @@ class SOSService {
 
   private notifySosChange(sosId: string): void {
     this.sosChangeListeners.get(sosId)?.forEach((cb) => cb());
+  }
+
+  // ── Location Tracking ──────────────────────────────────────────────────
+
+  /**
+   * Update the location stored inside an active SOS event.
+   * Called by the escalation system every 7 seconds during stage 2+.
+   */
+  updateSOSLocation(sosId: string, lat: number, lng: number): void {
+    const sos = this.activeSOS.get(sosId);
+    if (sos && sos.active) {
+      sos.lat = lat;
+      sos.lng = lng;
+      this.notifySosChange(sosId);
+    }
   }
 
   // ── Demo Helpers ───────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ export default function LocationDisplay({ location }: LocationDisplayProps) {
         <div className="flex items-center gap-2">
           <span className="text-gray-500">📍</span>
           <span className="text-sm text-gray-500">Getting location...</span>
+          <span className="ml-auto h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
         </div>
       </div>
     );
@@ -36,6 +37,11 @@ export default function LocationDisplay({ location }: LocationDisplayProps) {
           <div className="flex items-center gap-1.5 mb-1">
             <span className="text-green-400">📍</span>
             <span className="text-xs font-semibold text-green-400 uppercase tracking-wider">Location Active</span>
+            {location.isSimulated && (
+              <span className="ml-1 inline-flex items-center rounded-full bg-blue-900/40 px-1.5 py-0.5 text-[9px] font-semibold text-blue-400 uppercase tracking-wide">
+                Demo
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-400 font-mono">
             {location.lat.toFixed(5)}, {location.lng.toFixed(5)}

@@ -22,6 +22,8 @@ import { useFallDetection } from "@/hooks/useFallDetection";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useActiveLocation } from "@/hooks/useActiveLocation";
 import { useSOSBroadcast, useNearbySosAlert } from "@/hooks/useNearbySOS";
+import { useSOSEscalation } from "@/hooks/useSOSEscalation";
+import { useSiren } from "@/hooks/useSiren";
 import { sosService } from "@/lib/sosService";
 
 export type AppPage =
@@ -54,6 +56,10 @@ function App() {
     stopRecording,
     downloadClip,
   } = useAudioRecorder();
+
+  // ── Escalation system ────────────────────────────────────────────────
+  const escalation = useSOSEscalation();
+  const { startSiren, stopSiren } = useSiren();
 
   // ── Community SOS hooks ──────────────────────────────────────────────
   const activeLocation = useActiveLocation({ enabled: true });
@@ -113,7 +119,25 @@ function App() {
     startRecording();
     // Broadcast community SOS
     setTimeout(() => doBroadcastSOS(), 500);
-  }, [startRecording, doBroadcastSOS]);
+    // Fire escalation system — always trigger (hook handles fallback coords)
+    const lat = location?.lat ?? activeLocation.lat ?? 0;
+    const lng = location?.lng ?? activeLocation.lng ?? 0;
+    escalation.triggerSOS({
+      lat,
+      lng,
+      userId: activeLocation.userId,
+      phone: localStorage.getItem("shakesos-contact") || "+910000000000",
+      userName: localStorage.getItem("shakesos-contact-name") || "User",
+      onStartSiren: startSiren,
+      onStopSiren: stopSiren,
+      onLocationUpdate: (newLat, newLng) => {
+        // Update the SOS service with the fresh position
+        if (sosBroadcast.activeSosId) {
+          sosService.updateSOSLocation(sosBroadcast.activeSosId, newLat, newLng);
+        }
+      },
+    });
+  }, [startRecording, doBroadcastSOS, location, activeLocation, escalation, startSiren, stopSiren, sosBroadcast.activeSosId]);
 
   const handleAutoTrigger = useCallback(() => {
     setShowModal(false);
@@ -122,7 +146,19 @@ function App() {
     startRecording();
     // Broadcast community SOS
     setTimeout(() => doBroadcastSOS(), 500);
-  }, [startRecording, doBroadcastSOS]);
+    // Fire escalation system — always trigger
+    const lat = location?.lat ?? activeLocation.lat ?? 0;
+    const lng = location?.lng ?? activeLocation.lng ?? 0;
+    escalation.triggerSOS({
+      lat,
+      lng,
+      userId: activeLocation.userId,
+      phone: localStorage.getItem("shakesos-contact") || "+910000000000",
+      userName: localStorage.getItem("shakesos-contact-name") || "User",
+      onStartSiren: startSiren,
+      onStopSiren: stopSiren,
+    });
+  }, [startRecording, doBroadcastSOS, location, activeLocation, escalation, startSiren, stopSiren]);
 
   const handleStartMonitoring = useCallback(() => {
     requestLocation();
@@ -135,21 +171,35 @@ function App() {
     setSosTriggered(false);
     if (isRecording) stopRecording();
     sosBroadcast.cancelSOS();
+    escalation.cancelEscalation();
     setPage("home");
-  }, [isRecording, stopRecording, sosBroadcast]);
+  }, [isRecording, stopRecording, sosBroadcast, escalation]);
 
   const handleManualSOS = useCallback(() => {
     setSosTriggered(true);
     startRecording();
     // Broadcast community SOS
     setTimeout(() => doBroadcastSOS(), 500);
-  }, [startRecording, doBroadcastSOS]);
+    // Fire escalation system — always trigger
+    const lat = location?.lat ?? activeLocation.lat ?? 0;
+    const lng = location?.lng ?? activeLocation.lng ?? 0;
+    escalation.triggerSOS({
+      lat,
+      lng,
+      userId: activeLocation.userId,
+      phone: localStorage.getItem("shakesos-contact") || "+910000000000",
+      userName: localStorage.getItem("shakesos-contact-name") || "User",
+      onStartSiren: startSiren,
+      onStopSiren: stopSiren,
+    });
+  }, [startRecording, doBroadcastSOS, location, activeLocation, escalation, startSiren, stopSiren]);
 
   const handleResetSOS = useCallback(() => {
     setSosTriggered(false);
     if (isRecording) stopRecording();
     sosBroadcast.cancelSOS();
-  }, [isRecording, stopRecording, sosBroadcast]);
+    escalation.cancelEscalation();
+  }, [isRecording, stopRecording, sosBroadcast, escalation]);
 
   // Safety Timer SOS
   const handleTimerSOS = useCallback(() => {
@@ -160,7 +210,19 @@ function App() {
     startRecording();
     // Broadcast community SOS
     setTimeout(() => doBroadcastSOS(), 500);
-  }, [requestLocation, startRecording, doBroadcastSOS]);
+    // Fire escalation system — always trigger
+    const lat = location?.lat ?? activeLocation.lat ?? 0;
+    const lng = location?.lng ?? activeLocation.lng ?? 0;
+    escalation.triggerSOS({
+      lat,
+      lng,
+      userId: activeLocation.userId,
+      phone: localStorage.getItem("shakesos-contact") || "+910000000000",
+      userName: localStorage.getItem("shakesos-contact-name") || "User",
+      onStartSiren: startSiren,
+      onStopSiren: stopSiren,
+    });
+  }, [requestLocation, startRecording, doBroadcastSOS, location, activeLocation, escalation, startSiren, stopSiren]);
 
   const handleToggleRecording = useCallback(() => {
     if (isRecording) {
@@ -222,6 +284,7 @@ function App() {
                 isBroadcast={sosBroadcast.isBroadcast}
                 nearbyUsers={sosBroadcast.nearbyUsers}
                 volunteers={sosBroadcast.volunteers}
+                escalation={escalation}
               />
             )}
             {page === "timer" && (

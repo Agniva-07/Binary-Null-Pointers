@@ -3,9 +3,11 @@ import { LocationData } from "@/hooks/useGeolocation";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import LocationDisplay from "@/components/LocationDisplay";
 import VolunteerTracker from "@/components/VolunteerTracker";
+import SOSEscalationPanel from "@/components/SOSEscalationPanel";
 
 import type { SensorStatus } from "@/hooks/useShakeDetection";
 import type { NearbyUser, VolunteerInfo } from "@/lib/sosService";
+import type { EscalationState, EscalationActions } from "@/hooks/useSOSEscalation";
 
 interface SOSScreenProps {
   isMonitoring: boolean;
@@ -23,6 +25,8 @@ interface SOSScreenProps {
   isBroadcast?: boolean;
   nearbyUsers?: NearbyUser[];
   volunteers?: VolunteerInfo[];
+  // Escalation system
+  escalation?: (EscalationState & EscalationActions) | null;
 }
 
 export default function SOSScreen({
@@ -40,6 +44,7 @@ export default function SOSScreen({
   isBroadcast = false,
   nearbyUsers = [],
   volunteers = [],
+  escalation = null,
 }: SOSScreenProps) {
   const [shakeCount, setShakeCount] = useState(0);
   const [pressing, setPressing] = useState(false);
@@ -137,7 +142,7 @@ export default function SOSScreen({
             >
               <div className="flex items-center gap-3">
                 <span className="text-3xl">🆘</span>
-                <div>
+                <div className="flex-1">
                   <p className="font-bold text-red-400">SOS TRIGGERED</p>
                   <p className="text-xs text-red-300/70">Emergency message sent via WhatsApp</p>
                   {isRecording && (
@@ -148,8 +153,24 @@ export default function SOSScreen({
             </div>
           )}
 
-          {/* Community SOS Broadcast Status */}
-          {sosTriggered && isBroadcast && (
+          {/* ── Smart Escalation Panel ── */}
+          {sosTriggered && escalation && escalation.stage > 0 && (
+            <SOSEscalationPanel escalation={escalation} />
+          )}
+
+          {/* ── "I'm Responding" button (shown to anyone viewing this SOS) ── */}
+          {sosTriggered && escalation && escalation.stage > 0 && !escalation.responded && (
+            <button
+              onClick={escalation.handleResponse}
+              className="mb-4 w-full rounded-2xl border border-green-600/50 bg-green-950/30 py-3.5 text-sm font-bold text-green-400 transition-all active:scale-95 fade-in"
+              style={{ boxShadow: "0 0 16px rgba(34,197,94,0.2)" }}
+            >
+              ✅ I'm Responding — Stop Escalation
+            </button>
+          )}
+
+          {/* Community SOS Broadcast Status (legacy, shown only when escalation not active) */}
+          {sosTriggered && isBroadcast && (!escalation || escalation.stage === 0) && (
             <div
               className="mb-4 rounded-2xl border border-blue-500/30 bg-blue-950/20 p-4 fade-in"
               style={{ boxShadow: "0 0 20px rgba(59,130,246,0.15)" }}
@@ -161,7 +182,7 @@ export default function SOSScreen({
                     Community Alert Sent
                   </p>
                   <p className="text-xs text-blue-300/60">
-                    {nearbyUsers.length} users notified within 50m
+                    {nearbyUsers.length} users notified nearby
                   </p>
                 </div>
               </div>

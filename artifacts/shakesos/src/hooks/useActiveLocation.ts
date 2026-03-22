@@ -2,12 +2,21 @@
  * useActiveLocation — continuously tracks and registers user's location.
  *
  * - Watches geolocation every few seconds
+ * - Falls back to simulated demo coordinates when real GPS is unavailable
  * - Registers the user as "active" in the SOS service
  * - Returns current location and active status
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { sosService, type UserLocation } from "@/lib/sosService";
+
+// ── Demo fallback ────────────────────────────────────────────────────────────
+const DEMO_LAT = 22.5726;
+const DEMO_LNG = 88.3639;
+
+function jitter(base: number, range = 0.0003): number {
+  return base + (Math.random() - 0.5) * range;
+}
 
 interface UseActiveLocationOptions {
   /** Enable/disable tracking. */
@@ -23,6 +32,7 @@ interface ActiveLocationState {
   error: string | null;
   isActive: boolean;
   userId: string;
+  isSimulated: boolean;
 }
 
 /**
@@ -59,9 +69,10 @@ export function useActiveLocation({
     error: null,
     isActive: false,
     userId,
+    isSimulated: false,
   });
 
-  // Watch geolocation
+  // Watch geolocation — with fallback to simulated coords
   useEffect(() => {
     if (!enabled) {
       sosService.removeUser(userId);
@@ -69,54 +80,88 @@ export function useActiveLocation({
       return;
     }
 
-    if (!navigator.geolocation) {
-      setState((s) => ({ ...s, error: "Geolocation not supported" }));
-      return;
+    let lastUpdate = 0;
+    let simulatedInterval: ReturnType<typeof setInterval> | null = null;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let watchId: number | null = null;
+    let gotRealPosition = false;
+
+    /** Push a location update to the SOS service (throttled). */
+    function pushUpdate(lat: number, lng: number, acc: number, simulated: boolean) {
+      setState((s) => ({
+        ...s,
+        lat,
+        lng,
+        accuracy: acc,
+        error: null,
+        isActive: true,
+        isSimulated: simulated,
+      }));
+
+      const now = Date.now();
+      if (now - lastUpdate >= updateIntervalMs) {
+        lastUpdate = now;
+        const userLoc: UserLocation = {
+          userId,
+          lat,
+          lng,
+          phone: getUserPhone(),
+          displayName: getUserName(),
+          timestamp: now,
+        };
+        sosService.updateUserLocation(userLoc);
+      }
     }
 
-    let lastUpdate = 0;
+    /** Start simulated location updates every 5 seconds. */
+    function startSimulated() {
+      // Push one immediately
+      pushUpdate(jitter(DEMO_LAT), jitter(DEMO_LNG), 15, true);
+      simulatedInterval = setInterval(() => {
+        pushUpdate(jitter(DEMO_LAT), jitter(DEMO_LNG), 15, true);
+      }, 5000);
+    }
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const now = Date.now();
-        const newLat = pos.coords.latitude;
-        const newLng = pos.coords.longitude;
-        const newAcc = pos.coords.accuracy;
-
-        setState((s) => ({
-          ...s,
-          lat: newLat,
-          lng: newLng,
-          accuracy: newAcc,
-          error: null,
-          isActive: true,
-        }));
-
-        // Throttle service updates
-        if (now - lastUpdate >= updateIntervalMs) {
-          lastUpdate = now;
-          const userLoc: UserLocation = {
-            userId,
-            lat: newLat,
-            lng: newLng,
-            phone: getUserPhone(),
-            displayName: getUserName(),
-            timestamp: now,
-          };
-          sosService.updateUserLocation(userLoc);
+    if (navigator.geolocation) {
+      // Set a 4-second fallback — if no position comes through, go simulated
+      fallbackTimer = setTimeout(() => {
+        if (!gotRealPosition) {
+          startSimulated();
         }
-      },
-      (err) => {
-        setState((s) => ({ ...s, error: err.message }));
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 3000 }
-    );
+      }, 4000);
+
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          gotRealPosition = true;
+          if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+          if (simulatedInterval) { clearInterval(simulatedInterval); simulatedInterval = null; }
+
+          pushUpdate(
+            pos.coords.latitude,
+            pos.coords.longitude,
+            pos.coords.accuracy,
+            false
+          );
+        },
+        (_err) => {
+          // Error → switch to simulated immediately
+          if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+          if (!simulatedInterval) startSimulated();
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 3000 }
+      );
+    } else {
+      // No geolocation API — pure simulated
+      startSimulated();
+    }
 
     // Mark active
     setState((s) => ({ ...s, isActive: true }));
 
     return () => {
-      navigator.geolocation.clearWatch(watchId);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (simulatedInterval) clearInterval(simulatedInterval);
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       sosService.removeUser(userId);
       setState((s) => ({ ...s, isActive: false }));
     };
