@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { LocationData } from "@/hooks/useGeolocation";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import LocationDisplay from "@/components/LocationDisplay";
-import VolunteerTracker from "@/components/VolunteerTracker";
+import VolunteerList from "@/components/VolunteerList";
+import ChatModal from "@/components/ChatModal";
 import SOSEscalationPanel from "@/components/SOSEscalationPanel";
+import { useMockChat } from "@/hooks/useMockChat";
 
 import type { SensorStatus } from "@/hooks/useShakeDetection";
 import type { NearbyUser, VolunteerInfo } from "@/lib/sosService";
@@ -48,9 +50,30 @@ export default function SOSScreen({
 }: SOSScreenProps) {
   const [shakeCount, setShakeCount] = useState(0);
   const [pressing, setPressing] = useState(false);
+  const [activeChatVolunteerId, setActiveChatVolunteerId] = useState<string | null>(null);
   const contact = localStorage.getItem("shakesos-contact") || "";
   const contactName = localStorage.getItem("shakesos-contact-name") || contact;
   const { getGoogleMapsLink } = useGeolocation();
+
+  // ── Chat system ──────────────────────────────────────────────────────
+  const { getOrCreateSession, sendMessage, getSession, getUnreadCount } = useMockChat();
+
+  const handleOpenChat = useCallback((volunteerId: string, volunteerName: string) => {
+    getOrCreateSession(volunteerId, volunteerName);
+    setActiveChatVolunteerId(volunteerId);
+  }, [getOrCreateSession]);
+
+  const handleCloseChat = useCallback(() => {
+    setActiveChatVolunteerId(null);
+  }, []);
+
+  // Find the active volunteer info for chat header
+  const activeChatVolunteer = activeChatVolunteerId
+    ? volunteers.find((v) => v.helperId === activeChatVolunteerId)
+    : null;
+  const activeChatSession = activeChatVolunteerId
+    ? getSession(activeChatVolunteerId)
+    : undefined;
 
   const buildWhatsAppMessage = useCallback(() => {
     let locationText = "Location unavailable";
@@ -189,12 +212,16 @@ export default function SOSScreen({
             </div>
           )}
 
-          {/* Volunteer Tracker */}
+          {/* ── Active Volunteers + Chat ── */}
           {sosTriggered && isBroadcast && (
             <div className="mb-5">
-              <VolunteerTracker
+              <VolunteerList
                 volunteers={volunteers}
                 nearbyCount={nearbyUsers.length}
+                maxAssigned={3}
+                onOpenChat={handleOpenChat}
+                getSession={getSession}
+                getUnreadCount={getUnreadCount}
               />
             </div>
           )}
@@ -325,6 +352,17 @@ export default function SOSScreen({
           )}
         </div>
       </div>
+
+      {/* ── Chat Modal Overlay ── */}
+      {activeChatVolunteerId && activeChatSession && activeChatVolunteer && (
+        <ChatModal
+          session={activeChatSession}
+          volunteerDistance={activeChatVolunteer.distance}
+          volunteerStatus={activeChatVolunteer.status}
+          onSend={sendMessage}
+          onClose={handleCloseChat}
+        />
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import LiveLocationSharing from "@/components/LiveLocationSharing";
 import EmergencyChecklist from "@/components/EmergencyChecklist";
 import FlashlightSOS from "@/components/FlashlightSOS";
 import NearbyServices from "@/components/NearbyServices";
+import JudgesDemo from "@/pages/JudgesDemo";
 import { useShakeDetection } from "@/hooks/useShakeDetection";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useFallDetection } from "@/hooks/useFallDetection";
@@ -334,6 +335,9 @@ function App() {
             {page === "nearbyservices" && (
               <NearbyServices onBack={() => setPage("tools")} />
             )}
+          </Route>
+          <Route path="/demo">
+            <JudgesDemo />
           </Route>
         </Switch>
       </WouterRouter>
