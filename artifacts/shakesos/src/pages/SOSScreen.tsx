@@ -77,6 +77,7 @@ export default function SOSScreen({
     if (sosTriggered) {
       sendWhatsApp();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sosTriggered]);
 
   useEffect(() => {

@@ -5,9 +5,10 @@ interface HomeProps {
   onContact: () => void;
   isMonitoring: boolean;
   isRecording: boolean;
+  onStealth?: () => void;
 }
 
-export default function Home({ onStart, onContact, isMonitoring, isRecording }: HomeProps) {
+export default function Home({ onStart, onContact, isMonitoring, isRecording, onStealth }: HomeProps) {
   const [pressing, setPressing] = useState(false);
   const contact = localStorage.getItem("shakesos-contact") || "";
 
@@ -16,7 +17,11 @@ export default function Home({ onStart, onContact, isMonitoring, isRecording }: 
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="mb-3 flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-600 shadow-lg" style={{ boxShadow: "0 8px 32px rgba(220,38,38,0.4)" }}>
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-600 shadow-lg"
+              style={{ boxShadow: "0 8px 32px rgba(220,38,38,0.4)" }}
+              onDoubleClick={onStealth}
+            >
               <span className="text-2xl font-black text-white">SOS</span>
             </div>
           </div>
@@ -59,27 +64,24 @@ export default function Home({ onStart, onContact, isMonitoring, isRecording }: 
         </div>
 
         {/* Feature Grid */}
-        <div className="mb-6 grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-3 text-center">
-            <span className="text-2xl mb-1 block">🚨</span>
-            <p className="text-xs font-medium text-gray-300">Siren Mode</p>
-            <p className="text-[10px] text-gray-500">In Tools</p>
-          </div>
-          <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-3 text-center">
-            <span className="text-2xl mb-1 block">📞</span>
-            <p className="text-xs font-medium text-gray-300">Fake Call</p>
-            <p className="text-[10px] text-gray-500">In Fake Call tab</p>
-          </div>
-          <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-3 text-center">
-            <span className="text-2xl mb-1 block">⏱️</span>
-            <p className="text-xs font-medium text-gray-300">Safety Timer</p>
-            <p className="text-[10px] text-gray-500">In Timer tab</p>
-          </div>
-          <div className="rounded-xl border border-gray-800 bg-gray-900/30 p-3 text-center">
-            <span className="text-2xl mb-1 block">🤸</span>
-            <p className="text-xs font-medium text-gray-300">Fall Detection</p>
-            <p className="text-[10px] text-gray-500">In Tools</p>
-          </div>
+        <div className="mb-6 grid grid-cols-3 gap-2.5">
+          {[
+            { icon: "🚨", label: "Siren", sub: "In Tools" },
+            { icon: "📞", label: "Fake Call", sub: "Tab" },
+            { icon: "⏱️", label: "Timer", sub: "Tab" },
+            { icon: "🤸", label: "Fall Detect", sub: "Tools" },
+            { icon: "🔦", label: "SOS Flash", sub: "Tools" },
+            { icon: "🌙", label: "Stealth", sub: "Double-tap logo" },
+            { icon: "📍", label: "Live Loc", sub: "Tools" },
+            { icon: "📋", label: "Checklist", sub: "Tools" },
+            { icon: "🏥", label: "Services", sub: "Tools" },
+          ].map((item, i) => (
+            <div key={i} className="rounded-xl border border-gray-800 bg-gray-900/30 p-2.5 text-center">
+              <span className="text-xl mb-0.5 block">{item.icon}</span>
+              <p className="text-[11px] font-medium text-gray-300">{item.label}</p>
+              <p className="text-[9px] text-gray-500">{item.sub}</p>
+            </div>
+          ))}
         </div>
 
         {!contact && (

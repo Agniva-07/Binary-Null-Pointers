@@ -36,7 +36,7 @@ export interface NearbyUser {
 }
 
 export interface VolunteerInfo {
-  oderId: string;
+  orderId: string;
   helperId: string;
   phone: string;
   displayName?: string;
@@ -251,7 +251,7 @@ class SOSService {
   /** A helper accepts an SOS — store their info. */
   acceptHelp(
     sosId: string,
-    helper: Omit<VolunteerInfo, "status" | "acceptedAt" | "oderId">
+    helper: Omit<VolunteerInfo, "status" | "acceptedAt" | "orderId">
   ): VolunteerInfo | null {
     const sos = this.activeSOS.get(sosId);
     if (!sos || !sos.active) return null;
@@ -264,7 +264,7 @@ class SOSService {
 
     const vol: VolunteerInfo = {
       ...helper,
-      oderId: sosId,
+      orderId: sosId,
       status: "on_the_way",
       acceptedAt: Date.now(),
     };

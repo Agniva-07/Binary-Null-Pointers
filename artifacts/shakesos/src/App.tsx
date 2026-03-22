@@ -11,6 +11,11 @@ import SirenMode from "@/components/SirenMode";
 import SafetyTimer from "@/components/SafetyTimer";
 import BottomNav from "@/components/BottomNav";
 import NearbySOSAlert from "@/components/NearbySOSAlert";
+import StealthMode from "@/components/StealthMode";
+import LiveLocationSharing from "@/components/LiveLocationSharing";
+import EmergencyChecklist from "@/components/EmergencyChecklist";
+import FlashlightSOS from "@/components/FlashlightSOS";
+import NearbyServices from "@/components/NearbyServices";
 import { useShakeDetection } from "@/hooks/useShakeDetection";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useFallDetection } from "@/hooks/useFallDetection";
@@ -19,7 +24,16 @@ import { useActiveLocation } from "@/hooks/useActiveLocation";
 import { useSOSBroadcast, useNearbySosAlert } from "@/hooks/useNearbySOS";
 import { sosService } from "@/lib/sosService";
 
-export type AppPage = "home" | "contact" | "sos" | "timer" | "fakecall" | "tools";
+export type AppPage =
+  | "home"
+  | "contact"
+  | "sos"
+  | "timer"
+  | "fakecall"
+  | "tools"
+  | "livelocation"
+  | "checklist"
+  | "nearbyservices";
 
 function App() {
   const [page, setPage] = useState<AppPage>("home");
@@ -28,6 +42,8 @@ function App() {
   const [sosTriggered, setSosTriggered] = useState(false);
   const [showFakeCall, setShowFakeCall] = useState(false);
   const [showSiren, setShowSiren] = useState(false);
+  const [showFlashlight, setShowFlashlight] = useState(false);
+  const [showStealth, setShowStealth] = useState(false);
   const [fallDetectionEnabled, setFallDetectionEnabled] = useState(false);
 
   const { location, requestLocation } = useGeolocation();
@@ -159,7 +175,19 @@ function App() {
   }, []);
 
   // Should we show the bottom nav?
-  const showBottomNav = !showFakeCall && !showSiren && !showModal && page !== "sos" && page !== "contact";
+  const showBottomNav =
+    !showFakeCall &&
+    !showSiren &&
+    !showFlashlight &&
+    !showStealth &&
+    !showModal &&
+    page !== "sos" &&
+    page !== "contact";
+
+  // Stealth mode overlay
+  if (showStealth) {
+    return <StealthMode onExit={() => setShowStealth(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -172,6 +200,7 @@ function App() {
                 onContact={() => setPage("contact")}
                 isMonitoring={isMonitoring}
                 isRecording={isRecording}
+                onStealth={() => setShowStealth(true)}
               />
             )}
             {page === "contact" && (
@@ -220,6 +249,11 @@ function App() {
                 onBack={() => setPage("home")}
                 onSiren={() => setShowSiren(true)}
                 onFakeCall={() => setShowFakeCall(true)}
+                onFlashlight={() => setShowFlashlight(true)}
+                onStealth={() => setShowStealth(true)}
+                onLiveLocation={() => setPage("livelocation")}
+                onChecklist={() => setPage("checklist")}
+                onNearbyServices={() => setPage("nearbyservices")}
                 fallDetectionEnabled={fallDetectionEnabled}
                 onToggleFallDetection={() => setFallDetectionEnabled((v) => !v)}
                 isRecording={isRecording}
@@ -227,6 +261,15 @@ function App() {
                 audioClips={clips}
                 onDownloadClip={downloadClip}
               />
+            )}
+            {page === "livelocation" && (
+              <LiveLocationSharing onBack={() => setPage("tools")} />
+            )}
+            {page === "checklist" && (
+              <EmergencyChecklist onBack={() => setPage("tools")} />
+            )}
+            {page === "nearbyservices" && (
+              <NearbyServices onBack={() => setPage("tools")} />
             )}
           </Route>
         </Switch>
@@ -259,6 +302,11 @@ function App() {
       {/* Siren Mode Overlay */}
       {showSiren && (
         <SirenMode onClose={() => setShowSiren(false)} />
+      )}
+
+      {/* Flashlight SOS Overlay */}
+      {showFlashlight && (
+        <FlashlightSOS onClose={() => setShowFlashlight(false)} />
       )}
 
       {/* Bottom Navigation */}
